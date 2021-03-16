@@ -1,64 +1,56 @@
-package Controller;
-
-import java.math.BigDecimal;
-import javax.swing.JButton;
-import javax.swing.JTextField;
-
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
+package controller;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import javax.swing.JButton;
+import javax.swing.JTextField;
+
 /**
  *
- * @author HoaPC
+ * @author HuyenPT
  */
 public class Calculate {
 
+    private JTextField txtScreen;
     private BigDecimal firstNum;
     private BigDecimal secondNum;
-    private final JTextField text;
-    private boolean reset = false;
+    private boolean process = false; //check process is calculating
+    private boolean backSpace = false;
+    private boolean isError = false;
     private boolean isMR = false;
-    private boolean process = false; // Check process is calculating
     private int operator = -1;
-    //
-    private BigDecimal memory = new BigDecimal("0"); // BigDecimal dùng để convert String to number
+    private BigDecimal memory = new BigDecimal("0");
 
     public Calculate(JTextField text) {
-        this.text = text;
+        this.txtScreen = text;
         operator = -1;
-    }
-
-    public void setOperator(int operator) {
-        this.operator = operator;
     }
 
     public void pressNumber(JButton btn) {
         BigDecimal temp;
         String value = btn.getText();
-        //Nếu process hoặc reset là true -> xóa số cũ trên màn hình và set lại số mới
-        //Nếu process là false thì thêm dồn số mới nhập sau số cũ lên screen 
-        if (process || reset) {
-            text.setText("0"); 
+
+        if (process || isError) {//nhập số mới
+            txtScreen.setText("0");//set về 0 để khi nhập số tiếp theo không còn số cũ ở đầu
+            //set lại để bấm được nhiều lần cho 1 btn
             process = false;
-            reset = false;
+            isError = false;
         }
+        //nhập tiếp 
+        temp = new BigDecimal(txtScreen.getText() + value);
+        txtScreen.setText(temp + "");
+        //có thể xóa được
+        backSpace = true;
         isMR = false;
-        temp = new BigDecimal(text.getText() + value);
-        text.setText(temp + "");
     }
 
-    public void pressDot() {
-        if (process || reset) {
-            // Set text = 0 để gặp trường hợp người dùng nhập '.' thì màn hình sẽ hiện thị '0.'     
-            text.setText("0");
-            process = false;
-            reset = false;
-        }
-        if (!text.getText().contains(".")) {
-            text.setText(text.getText() + ".");
-        }
+    public void setOperator(int ope) {
+        this.operator = ope;
     }
 
     //return number from resultScreen
@@ -66,129 +58,210 @@ public class Calculate {
         if (isMR) {
             return memory;
         }
-        String value = text.getText();
+        String value = txtScreen.getText();
         BigDecimal temp = new BigDecimal(value);
         return temp;
     }
 
-    public void pressClear() {
-        firstNum = new BigDecimal("0");
-        secondNum = new BigDecimal("0");
-        operator = -1;
-    }
-
-    //thực hiện các phép tính cộng trừ nhân chia
+    //calculating
     public void calculate() {
         boolean flag = false;
         /*process là true khi đang thực hiện phép tính hoặc nhấn dấu =.
         khi này số trên màn hình không thay đổi (firstNum)
-        ->khi pressNum sau đó pressCalculate -> fristNum & process = true
-        */
-        if (!process) {//nếu không có dk này -> secondNum = firstNum & thực hiện phép tính
+        **khi nhấn pressNum sau đó nhấn pressCalculate -> firstNum / process = true
+        pressNum sau đó nhấn pressCalculate ->secondNum -> calculate
+         */
+        //process chỉ = false sau khi nhập số và = true khi nhập phép toán
+
+        if (!process) {//nếu không có dk này khi nhập 2 phép toán liên tiếp 
+            //-> secondNum(sau) = firstNum+secondNum (trước) (vì 2num lấy value từ screen) -> thực hiện phép tính
             if (operator == -1) {
-                firstNum = getValue();
+                firstNum = getValue();//get value from screen
+                System.out.println("fi:" + firstNum);
             } else {
                 secondNum = getValue();
+                System.out.println("se:" + secondNum);
                 switch (operator) {
-                    case 1:
+                    case 1: {
                         firstNum = firstNum.add(secondNum);
                         break;
-                    case 2:
+                    }
+                    case 2: {
                         firstNum = firstNum.subtract(secondNum);
                         break;
-                    case 3:
-                        firstNum = firstNum.multiply(secondNum);
+                    }
+                    case 3: {
+                        firstNum = firstNum.multiply(secondNum).setScale(7, RoundingMode.HALF_UP);//??? làm tròn 7 chữ số sau dấu ','
                         break;
-                    case 4:
+                    }
+                    case 4: {
                         if (secondNum.doubleValue() != 0) {
-                            double result = firstNum.doubleValue() / secondNum.doubleValue();
-                            firstNum = new BigDecimal(result + "");
+                            firstNum = firstNum.divide(secondNum, 8, RoundingMode.HALF_UP);
                             break;
                         } else {
                             flag = true;
                         }
+
+                    }
                 }
             }
-            text.setText(firstNum + "");
-            if (flag) {
-                text.setText("ERROR");
-            }
+            backSpace = true;
             process = true;
-            reset = true;
+            /*
+            stripTrailingZeros(): xóa chữ số không thừa sau dấu phẩy
+            toPlainString(): display reality number with string.
+            vd: 1x1000000000 = 1e^16 -> 1000000000 
+             */
+            txtScreen.setText(firstNum.stripTrailingZeros().toPlainString() + "");
+            if (flag) {
+                txtScreen.setText("ERROR");
+                isError = true;
+            }
         }
     }
 
     public void pressResult() {
-        if (!text.getText().equals("ERROR")) {
+        if (!isError) {
             calculate();
-            operator = -1;
+            operator = -1;//result -> firstNum if not result -> secondNum
         } else {
-            text.setText(firstNum + "");
+            txtScreen.setText(firstNum.stripTrailingZeros().toPlainString());
+            isError = false;
         }
+        process = true;
+        backSpace = false;//hiển thị kq không cho phép xóa lùi
     }
 
-    public void pressNegate() {
-        pressResult();
-        text.setText(getValue().negate() + "");
+    public void pressClear() {
+        txtScreen.setText("0");
         process = false;
-        // Neu ko set lại reset thì khi kết quả là số negate, sau đó nhập vào số mới, sẽ bị nối cuối vào số đó
-        reset = true;
+        operator = -1;
+        backSpace = false;
+        isError = false;
     }
 
-    public void pressSqrt() {
-        pressResult();
-        BigDecimal result = getValue();
-        if (result.doubleValue() >= 0) {
-            String display = Math.sqrt(result.doubleValue()) + "";
-            if (display.endsWith(".0")) {
-                display = display.replace(".0", "");
+    public void pressNegative() {
+        if (isError) {
+            return;
+        }
+        StringBuilder temp = new StringBuilder(txtScreen.getText());
+        if (!txtScreen.getText().equalsIgnoreCase("0")) {
+            if (temp.charAt(0) != '-') {
+                temp.insert(0, '-');
+            } else {
+                temp.deleteCharAt(0);
             }
-            text.setText(display);
-            process = false;
-        } else {
-            text.setText("ERROR");
         }
-        reset = true;
-    }
-
-    public void pressPercent() {
-        pressResult();
-        text.setText((getValue().doubleValue()) / 100 + "");
-        process = false;
-        reset = true;
+        if (!process) {
+            backSpace = true;
+        } else {
+            backSpace = false;
+        }
+        txtScreen.setText(temp + "");
+        isError = false;
     }
 
     public void pressInvert() {
-
-        pressResult();
+        if (isError) {
+            return;
+        }
         double result = getValue().doubleValue();
         if (result != 0) {
-            text.setText((1 / result) + "");
-            process = false;
+            firstNum = new BigDecimal(String.valueOf(1 / Double.parseDouble(getValue() + "")));
+//            System.out.println("-----\nvalue:" + getValue());
+//            System.out.println("so chia:" + Double.parseDouble(getValue() + ""));
+//            System.out.println("inside : " + String.valueOf(1 / Double.parseDouble(getValue() + "")));
+//            System.out.println("fi:"+firstNum);
+            txtScreen.setText(firstNum.stripTrailingZeros().toPlainString());
         } else {
-            text.setText("ERROR");
+            txtScreen.setText("EORROR");
+            isError = true;
         }
-        reset = true;
+        process = false;
+        backSpace = false;
+        isError = false;
     }
 
-    public void pressMR() {
-        text.setText(memory + "");
-        isMR = true;
+    public void pressBackSpace() {
+        if (backSpace) {
+            StringBuilder temp = new StringBuilder(txtScreen.getText());
+            if (temp.length() > 1) {
+                if (temp.length() == 3 && temp.charAt(0) == '-' && temp.charAt(2) == '.') {
+                    //vd: -5. -> 0
+                    txtScreen.setText("0");
+                } else if (temp.length() == 2 && temp.charAt(0) == '-') {//vd: -5
+                    txtScreen.setText("0");
+                } else {//xóa ký tự cuối
+                    temp.deleteCharAt(temp.length() - 1);
+                    txtScreen.setText(temp.toString());
+                }
+            } else {
+                txtScreen.setText("0");
+            }
+        }
+    }
+
+    public void pressPercent() {
+        if (isError) {
+            return;
+        }
+        BigDecimal result = getValue().divide(new BigDecimal("100"), 7, RoundingMode.HALF_EVEN);
+        txtScreen.setText(result.stripTrailingZeros().toPlainString());
+        isError = false;
+        backSpace = false;
+    }
+
+    public void pressSqrt() {
+        if (isError) {
+            return;
+        }
+        double num = getValue().doubleValue();
+        if (num < 0) {
+            txtScreen.setText("ERROR");
+            isError = true;
+        } else {
+            BigDecimal result = new BigDecimal(Math.sqrt(num)).setScale(7, RoundingMode.HALF_UP);
+            txtScreen.setText(result.stripTrailingZeros().toPlainString());
+        }
+        backSpace = false;
+        isError = false;
+    }
+
+    public void pressDot() {
+        if (process || isError) {
+            //Set text = 0 để gặp trường hợp người dùng nhập '.' thì màn hình sẽ hiện thị '0.'
+            txtScreen.setText("0.");
+            process = false;//số tiếp theo nhập vào được viết sau số cũ
+            isError = false;
+        }
+        BigDecimal num = getValue();
+        if (!txtScreen.getText().contains(".")) {
+            txtScreen.setText(getValue() + ".");
+        }
     }
 
     public void pressMC() {
         memory = new BigDecimal("0");
     }
 
+    public void pressMR() {
+        txtScreen.setText(memory.stripTrailingZeros().toPlainString());
+        isMR = true;
+        isError = false;
+    }
+
     public void pressMAdd() {
-        memory = memory.add(getValue());
-        process = false;
-        reset = true;
+        if (!isError) {
+            memory = memory.add(getValue());
+        }
+        backSpace = false;
     }
 
     public void pressMSub() {
-        memory = memory.add(getValue().negate());
-        process = false;
-        reset = true;
+        if (!isError) {
+            memory = memory.add(getValue().negate());
+        }
+        backSpace = false;
     }
+
 }
